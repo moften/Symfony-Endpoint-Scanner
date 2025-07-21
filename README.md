@@ -33,7 +33,7 @@ $ python3 -m venv venv && source venv/bin/activate
 
 # Instalar dependencias
 $ pip install -r requirements.txt
-
+```
 ---
 
 ## 🧪 Ejemplo de salida
