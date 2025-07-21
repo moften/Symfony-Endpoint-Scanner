@@ -52,5 +52,31 @@ $ pip install -r requirements.txt
 [+] Posible endpoint válido: https://demo.ejemplo.com/login (Status: 403)
 
 ```
+---
 
+## 🙌 Apóyame
+
+Si esta herramienta te ha sido útil o quieres apoyar futuros desarrollos, puedes invitarme un café ☕ o hacer una donación. ¡Cualquier apoyo cuenta!
+
+[![Donate with PayPal](https://img.shields.io/badge/PayPal-Donate-blue.svg)](https://www.paypal.com/paypalme/moften)
+
+---
+
+## 📬 Contacto y redes
+
+- 💌 Correo: [m10sec@proton.me](mailto:m10sec@proton.me)
+- 🌐 Blog: [https://m10.com.mx](https://m10.com.mx)
+- 🐦 Twitter: [@hack4lifemx](https://twitter.com/hack4lifemx)
+- 💼 LinkedIn: [Francisco Santibañez](https://www.linkedin.com/in/franciscosantibanez)
+- 🐙 GitHub: [github.com/m10sec](https://github.com/moften)
+
+---
+
+## 🛡️ Filosofía
+
+Creo en un mundo donde los usuarios tienen control sobre su privacidad. Esta herramienta nace desde la trinchera del pentesting real, con amor por la libertad digital y el hacking con propósito.
+
+---
+
+⭐ Si te gustó este proyecto, dale una estrella en GitHub y compártelo con tu comunidad.
 
