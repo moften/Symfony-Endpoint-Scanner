@@ -62,7 +62,7 @@ HEADERS = {
 
 def banner():
     print("==============================================")
-    print("       Symfony Endpoint Scanner v1.0          ")
+    print("       Symfony Endpoint Scanner v1.1          ")
     print("   Busca rutas públicas comunes de Symfony    ")
     print("               by m10sec (2025)               ")
     print("==============================================\n")
