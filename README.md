@@ -6,12 +6,12 @@ Desarrollado por **m10sec (2025)**.
 
 ---
 
-## 🔍 Descripción
+## Descripción
 Symfony Endpoint Scanner es una herramienta simple en Python que realiza peticiones HTTP a rutas comunes utilizadas en entornos Symfony. Su propósito es detectar endpoints expuestos como `/_profiler`, `/config.php`, `/admin`, `/login`, entre otros, que pueden representar vectores de ataque si están accesibles.
 
 ---
 
-## ⚖️ Características
+## Características
 
 - Basado en `requests`
 - Rutas predefinidas comunes en Symfony (debug, autenticación, APIs, rutas JS)
@@ -21,7 +21,7 @@ Symfony Endpoint Scanner es una herramienta simple en Python que realiza peticio
 
 ---
 
-## 🚀 Instalación
+## Instalación
 
 ```bash
 # Clonar el repositorio
@@ -32,24 +32,87 @@ $ cd Symfony-Endpoint-Scanner
 $ python3 -m venv venv && source venv/bin/activate
 
 # Instalar dependencias
-$ pip install -r requirements.txt
+$ pip3 install -r requirements.txt
 ```
 ---
+## Uso
+
+# [+] Escaneo rápido de rutas conocidas:
+
+```bash
+python3 SymfonyScanner.py https://example.com
+```
+
+# [+] Escaneo con wordlist adicional y seguimiento de redirecciones:
+
+```bash
+python3 SymfonyScanner.py https://example.com -w rutas.txt --follow
+```
+# Minimizar ruido en clientes:
+
+```bash
+--head-first --codes 200,301,302,401,403
+```
+Inspección en BurpSuite:
+```bash
+--proxy http://127.0.0.1:8080
+```
+
+# Opciones:
+```bash
+	•	-w, --wordlist → Archivo de rutas adicionales.
+	•	-p, --paths → Rutas extra por CLI (/health /metrics).
+	•	--codes → Filtrar solo ciertos códigos de estado (200,301,302,403).
+	•	--head-first → Intenta HEAD antes de GET (más sigiloso).
+	•	--proxy → Enviar tráfico a un proxy (http://127.0.0.1:8080).
+	•	--threads → Número de hilos concurrentes (default: 20).
+	•	--format y --out → Guardar resultados en json o csv.
+```
+
+# Escanear una app Symfony filtrando solo respuestas relevantes:
+```bash
+python3 SymfonyScanner.py https://target.com --head-first --codes 200,301,302,401,403
+```
+
+# Las no coincidencias:
+```bash
+python3 SymfonyScanner.py https://target.com --head-first --codes 200,301,302,401,403 --verbose
+```
+
+# Escanear con wordlist y guardar en CSV:
+```bash
+python3 SymfonyScanner.py https://target.com -w symfony-common.txt --format csv --out resultados.csv
+```
+---
+
 
 ## 🧪 Ejemplo de salida
 
 ```bash
 ==============================================
-       Symfony Endpoint Scanner v1.0          
+
+     /$$$$$$$$                 /$$                     /$$             /$$    
+    | $$_____/                | $$                    |__/            | $$    
+    | $$       /$$$$$$$   /$$$$$$$  /$$$$$$   /$$$$$$  /$$ /$$$$$$$  /$$$$$$  
+    | $$$$$   | $$__  $$ /$$__  $$ /$$__  $$ /$$__  $$| $$| $$__  $$|_  $$_/  
+    | $$__/   | $$  \ $$| $$  | $$| $$  \ $$| $$  \ $$| $$| $$  \ $$  | $$    
+    | $$      | $$  | $$| $$  | $$| $$  | $$| $$  | $$| $$| $$  | $$  | $$ /$$
+    | $$$$$$$$| $$  | $$|  $$$$$$$| $$$$$$$/|  $$$$$$/| $$| $$  | $$  |  $$$$/
+    |________/|__/  |__/ \_______/| $$____/  \______/ |__/|__/  |__/   \___/  
+                                  | $$                                        
+                                  | $$                                        
+                                  |__/                                        
+    
+       Symfony Endpoint Scanner v1.2.0        
    Busca rutas públicas comunes de Symfony    
                by m10sec (2025)               
 ==============================================
 
-🔍 Escaneando endpoints comunes de Symfony en: https://demo.ejemplo.com
+🔍 Escaneando endpoints comunes de Symfony en: https://target.com 
 
-[+] Posible endpoint válido: https://demo.ejemplo.com/_profiler (Status: 200)
-[-] No válido: https://demo.ejemplo.com/build/vendor.js (Status: 404)
-[+] Posible endpoint válido: https://demo.ejemplo.com/login (Status: 403)
+[+] Posible endpoint válido: https://target.com/_profiler (Status: 200)
+[-] No válido: https://target.com/build/vendor.js (Status: 404)
+[+] Posible endpoint válido: https://target.com/login (Status: 403)
 
 ```
 ---
