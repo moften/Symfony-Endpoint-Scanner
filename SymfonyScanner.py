@@ -54,9 +54,28 @@ COMMON_PATHS: List[str] = [
     # API comunes (REST, GraphQL, Swagger, JWT)
     "/api/users", "/api/v1/users", "/api/v1/token", "/api/login_check",
     "/api/doc", "/api/docs", "/api/swagger", "/api/platform", "/api/graphql",
+    "/swagger", "/swagger-ui", "/_docs", "/api/doc", "/api/doc.json", "/api/v1/doc",
 
     # Otros posibles accesos
     "/debug/", "/adminer",
+    "/_fragment",
+    "/_profiler/{token}", "/_wdt/{token}", "/_error/404", "/_error/500",
+    "app_dev.php/_profiler", "app_dev.php/_wdt",
+
+    "/authentication_token",
+    "/connect/{provider}", "/login/check-{provider}",
+    "/graphql-playground", "/playground", "/voyager", "/altair",
+
+    "/.well-known/mercure", "/mercure",
+
+    "/phpmyadmin", "/pma",
+    "/bundles/easyadmin/", "/bundles/sonataadmin/",
+
+    "/.env", "/.env.local", "/.env.prod",
+    "/.git/HEAD", "/.git/config", "/.svn/entries",
+    "/composer.json", "/package.json", "/yarn.lock",
+    "/.htaccess", "/.htpasswd", "/.DS_Store",
+    "/server-status", "/server-info",   # <-- faltaba esta coma 
 
     # FOSUserBundle
     "/register", "/register/check-email", "/register/confirmed",
@@ -95,7 +114,7 @@ COMMON_PATHS: List[str] = [
     "/health", "/healthz", "/ready", "/status", "/ping", "/_ping", "/metrics",
 
     # Archivos de sitio
-    "/robots.txt", "/sitemap.xml", "/sitemap_index.xml",
+    "/robots.txt", "/sitemap.xml", "/sitemap_index.xml", "/sitemap.xml.gz", "/sitemap1.xml", "/sitemap2.xml",
 
     # Well-known
     "/.well-known/security.txt", "/.well-known/change-password",
@@ -103,13 +122,101 @@ COMMON_PATHS: List[str] = [
     "/.well-known/assetlinks.json", "/.well-known/apple-app-site-association",
 ]
 
+# =========================
+# Backups / Volcados
+# =========================
+
+# Lista estática rápida
+BACKUP_PATHS: List[str] = [
+    # Directorios típicos de backups
+    "/backup/", "/backups/", "/_backup/", "/_backups/",
+    "/var/backups/", "/storage/backups/", "/tmp/backups/",
+    "/db/backup/", "/database/backup/", "/mysql/backup/", "/pg/backup/",
+
+    # Volcados frecuentes (DB / exports)
+    "/dump.sql", "/dump.sql.gz", "/dump.sql.zip", "/dump.tar.gz",
+    "/database.sql", "/database.sql.gz", "/database.sql.zip",
+    "/db.sql", "/db.sql.gz", "/db.sql.zip",
+    "/export.sql", "/export.sql.gz",
+    "/mysql.sql", "/postgres.sql",
+    "/backup.sql", "/backup.sql.gz", "/backup.tar.gz",
+
+    # Copias de .env y config
+    "/.env.bak", "/.env.backup", "/.env.old", "/.env~",
+    "/.env.local.bak", "/.env.prod.bak",
+    "/parameters.yml.bak", "/parameters.yml~", "/parameters.yaml.bak",
+    "/config/packages/prod/framework.yaml.bak",
+    "/composer.json.bak", "/composer.lock.bak",
+    "/symfony.lock.bak", "/.htaccess.bak", "/.htaccess~",
+
+    # Archivos empaquetados comunes
+    "/backup.zip", "/backups.zip", "/site-backup.zip",
+    "/backup.tar", "/backup.tar.gz", "/backup.tgz",
+    "/full-backup.zip", "/public-backup.zip", "/app-backup.zip",
+
+    # Copias por editores/CI
+    "/.env.save", "/.env.tmp", "/.env.swp", "/.env.swo",
+    "/parameters.yml.orig", "/parameters.yml.save",
+]
+
+# Generador de variantes para ampliar la cobertura sin inflar el repo
+SENSITIVE_BASENAMES = [
+    ".env", ".env.local", ".env.prod",
+    "composer.json", "composer.lock", "symfony.lock",
+    "parameters.yml", "parameters.yaml",
+    "config/packages/prod/framework.yaml",
+    "config/services.yaml", ".htaccess",
+    "public/index.php", "app.php", "app_dev.php",
+]
+
+BACKUP_SUFFIXES = [
+    ".bak", ".old", ".orig", ".save", "~", ".tmp",
+    ".swp", ".swo", ".zip", ".tar", ".tar.gz", ".tgz", ".gz", ".7z", ".rar"
+]
+
+BACKUP_DIRS = [
+    "/", "/public/", "/web/", "/var/", "/var/backups/", "/backup/", "/backups/", "/tmp/", "/storage/backups/"
+]
+
+def gen_backup_candidates() -> List[str]:
+    out: List[str] = []
+
+    # Combos basename + sufijos en varios directorios
+    for base in SENSITIVE_BASENAMES:
+        for d in BACKUP_DIRS:
+            for suf in BACKUP_SUFFIXES:
+                out.append(f"{d}{base}{suf}")
+
+    # Nombres de dumps genéricos con empaquetados
+    dump_names = ["dump", "database", "db", "backup", "export", "mysql", "postgres"]
+    dump_exts  = [".sql", ".sql.gz", ".sql.zip", ".tar.gz", ".zip", ".tgz"]
+    for d in BACKUP_DIRS:
+        for n in dump_names:
+            for ext in dump_exts:
+                out.append(f"{d}{n}{ext}")
+
+    # Directorios “contenedor” de backups
+    out += [
+        "/backup/", "/backups/", "/_backup/", "/_backups/",
+        "/db/backup/", "/database/backup/", "/mysql/backup/", "/pg/backup/",
+        "/storage/backups/", "/var/backups/", "/tmp/backups/"
+    ]
+
+    # De-dup rápido conservando orden
+    seen = set()
+    uniq: List[str] = []
+    for p in out:
+        if p not in seen:
+            uniq.append(p); seen.add(p)
+    return uniq
+
 DEFAULT_HEADERS: Dict[str, str] = {
     "User-Agent": "Mozilla/5.0 (compatible; SymfonyScanner/1.2.1)",
     "Accept": "*/*",
 }
 
 def banner() -> None:
-    print("==============================================")
+    print("====================================================================================")
     ascii_art = r"""
      /$$$$$$$$                 /$$                     /$$             /$$    
     | $$_____/                | $$                    |__/            | $$    
@@ -127,7 +234,7 @@ def banner() -> None:
     print("       Symfony Endpoint Scanner v1.2.1        ")
     print("   Busca rutas públicas comunes de Symfony    ")
     print("               by m10sec (2025)               ")
-    print("==============================================\n")
+    print("===================================================================================\n")
 
 def build_session(timeout: int, retries: int, backoff: float, verify_tls: bool, proxy: Optional[str]) -> requests.Session:
     sess = requests.Session()
@@ -308,8 +415,10 @@ def main() -> None:
     if extra_headers:
         session.headers.update(extra_headers)
 
-    # compilar lista de paths (dedup manteniendo orden)
-    targets = list(dict.fromkeys(COMMON_PATHS + args.paths + load_wordlist(args.wordlist)))
+    # compilar lista de paths (dedup manteniendo orden) — incluye backups
+    targets = list(dict.fromkeys(
+        COMMON_PATHS + BACKUP_PATHS + gen_backup_candidates() + args.paths + load_wordlist(args.wordlist)
+    ))
 
     print(f"🔍 Escaneando endpoints comunes de Symfony en: {Fore.CYAN}{base_url}{Style.RESET_ALL}")
     print(f"   Rutas objetivo: {len(targets)} | Hilos: {args.threads} | Timeout: {args.timeout}s\n")
