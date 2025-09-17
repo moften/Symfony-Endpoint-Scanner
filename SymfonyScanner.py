@@ -75,7 +75,7 @@ COMMON_PATHS: List[str] = [
     "/.git/HEAD", "/.git/config", "/.svn/entries",
     "/composer.json", "/package.json", "/yarn.lock",
     "/.htaccess", "/.htpasswd", "/.DS_Store",
-    "/server-status", "/server-info",   # <-- faltaba esta coma 
+    "/server-status", "/server-info", "package-lock.json", "npm-shrinkwrap.json", "node_modules/",
 
     # FOSUserBundle
     "/register", "/register/check-email", "/register/confirmed",
