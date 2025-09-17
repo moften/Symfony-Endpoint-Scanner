@@ -27,7 +27,6 @@ try:
     from colorama import Fore, Style, init as colorama_init
     colorama_init(autoreset=True)
 except Exception:
-    # Fallback si no está colorama
     class _Dummy:
         def __getattr__(self, k): return ""
     Fore = Style = _Dummy()
@@ -126,7 +125,6 @@ COMMON_PATHS: List[str] = [
 # Backups / Volcados
 # =========================
 
-# Lista estática rápida
 BACKUP_PATHS: List[str] = [
     # Directorios típicos de backups
     "/backup/", "/backups/", "/_backup/", "/_backups/",
@@ -227,9 +225,9 @@ def banner() -> None:
 ░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░                                                                                                                       
     """
     print(ascii_art)
-    print("       Symfony Endpoint Scanner v1.2.2        ")
+    print("     ☠️ Symfony Endpoint Scanner v1.2.2 ☠️     ")
     print("   Busca rutas públicas comunes de Symfony    ")
-    print("               by m10sec (2025)               ")
+    print("             🏴‍☠️ by m10sec (2025) 🏴‍☠️            ")
     print("===================================================================================\n")
 
 def build_session(timeout: int, retries: int, backoff: float, verify_tls: bool, proxy: Optional[str]) -> requests.Session:
@@ -251,7 +249,7 @@ def build_session(timeout: int, retries: int, backoff: float, verify_tls: bool, 
         sess.proxies = {"http": proxy, "https": proxy}
     sess.headers.update(DEFAULT_HEADERS)
     # atributo simple para reusar en llamadas
-    sess.request_timeout = timeout  # type: ignore[attr-defined]
+    sess.request_timeout = timeout 
     return sess
 
 def parse_headers(headers_list: List[str]) -> Dict[str, str]:
@@ -267,9 +265,8 @@ def parse_headers(headers_list: List[str]) -> Dict[str, str]:
 def is_interesting_status(code: int, allow_codes: Set[int]) -> bool:
     if allow_codes:
         return code in allow_codes
-    # por defecto, consideramos “interesantes”
     return code in (200, 301, 302, 401, 403)
-
+#o yes o yes XDDDD
 def symfony_fingerprints(resp: requests.Response, body_sample: Optional[str]) -> List[str]:
     hints: List[str] = []
     # Cabeceras típicas del profiler
@@ -388,7 +385,6 @@ def main() -> None:
         print(f"{Fore.YELLOW}[!] La URL no contiene esquema, asumiendo https://{Style.RESET_ALL}")
         base_url = "https://" + base_url
 
-    # códigos permitidos
     allow_codes: Set[int] = set()
     if args.codes:
         try:
@@ -397,7 +393,6 @@ def main() -> None:
             print(f"{Fore.YELLOW}[!] --codes inválido, usando por defecto.{Style.RESET_ALL}")
             allow_codes = set()
 
-    # construir session
     session = build_session(
         timeout=args.timeout,
         retries=args.retries,
@@ -406,23 +401,21 @@ def main() -> None:
         proxy=args.proxy
     )
 
-    # headers extra
     extra_headers = parse_headers(args.header)
     if extra_headers:
         session.headers.update(extra_headers)
 
-    # compilar lista de paths (dedup manteniendo orden) — incluye backups
     targets = list(dict.fromkeys(
         COMMON_PATHS + BACKUP_PATHS + gen_backup_candidates() + args.paths + load_wordlist(args.wordlist)
     ))
 
-    print(f"🔍 Escaneando endpoints comunes de Symfony en: {Fore.CYAN}{base_url}{Style.RESET_ALL}")
+    print(f"☠️ Escaneando endpoints comunes de Symfony en: {Fore.CYAN}{base_url}{Style.RESET_ALL}")
     print(f"   Rutas objetivo: {len(targets)} | Hilos: {args.threads} | Timeout: {args.timeout}s\n")
 
     results: List[Dict[str, Any]] = []
-    ok_count = 0           # “interesantes” según la lógica activa
+    ok_count = 0           
     err_count = 0
-    match_count = 0        # coinciden con --codes cuando --codes está activo
+    match_count = 0       
 
     with ThreadPoolExecutor(max_workers=args.threads) as ex:
         future_map = {ex.submit(
@@ -441,7 +434,6 @@ def main() -> None:
             interesting = is_interesting_status(code, allow_codes) if code is not None else False
             color = Fore.GREEN if interesting else Fore.LIGHTBLACK_EX
 
-            # Si hay --codes, solo mostramos coincidentes a menos que --verbose esté activo
             if args.codes and not interesting and not args.verbose:
                 continue
 
@@ -465,7 +457,6 @@ def main() -> None:
     else:
         print(f"{Fore.CYAN}Resumen:{Style.RESET_ALL} interesantes={ok_count} | errores={err_count} | total={len(results)}")
 
-    # Guardado: si --codes está activo, por defecto guardamos solo coincidentes
     to_save = results
     if args.codes and not args.save_all:
         to_save = [r for r in results if ("status" in r and is_interesting_status(r["status"], allow_codes))]
