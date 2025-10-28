@@ -156,7 +156,7 @@ COMMON_PATHS: List[str] = [
     "package-lock.json", 
     "npm-shrinkwrap.json", 
     "node_modules/",
-
+    "/maintenance",
     # FOSUserBundle
     "/register", 
     "/register/check-email", 
@@ -173,15 +173,14 @@ COMMON_PATHS: List[str] = [
 
     # SymfonyCasts bundles
     "/reset-password", 
-    "/reset-password/check-email", 
     "/reset-password/reset", 
     "/reset-password/reset/abcdef1234",
     "/verify/email", 
     "/verify-email", 
     "/verify-email/abcdef1234",
-    "/2fa", "/2fa_check", 
+    "/2fa", 
+    "/2fa_check", 
     "/2fa/qr-code",
-
     # API Platform / Swagger / GraphQL
     "/api", 
     "/api/docs", 
@@ -194,7 +193,6 @@ COMMON_PATHS: List[str] = [
     "/graphql", 
     "/graphiql", 
     "/graphql-playground",
-
     # Auth y JWT/OAuth
     "/login_check", 
     "/api/login_check",
@@ -206,7 +204,6 @@ COMMON_PATHS: List[str] = [
     "/oauth/token", 
     "/oauth/refresh_token",
     "/connect/",
-
     # Admin bundles
     "/easyadmin", 
     "/admin/logout", 
@@ -214,7 +211,6 @@ COMMON_PATHS: List[str] = [
     "/admin/resetting/reset/abcdef",
     "/adminer", 
     "/adminer.php",
-
     # Dev/Debug
     "/_profiler/abcdef", 
     "/_wdt/abcdef", 
@@ -284,8 +280,14 @@ BACKUP_PATHS: List[str] = [
     "/full-backup.zip", "/public-backup.zip", "/app-backup.zip",
 
     # Copias por editores/CI
-    "/.env.save", "/.env.tmp", "/.env.swp", "/.env.swo",
-    "/parameters.yml.orig", "/parameters.yml.save",
+    "/.env.save", 
+    "/.env.tmp", 
+    "/.env.swp", 
+    "/.env.swo",
+    "/parameters.yml.orig", 
+    "/parameters.yml.save", 
+    "/.env.copy", 
+    "/.env.tmp.bak",
 ]
 
 # Generador de variantes para ampliar la cobertura sin inflar el repo
