@@ -1,4 +1,4 @@
-# Symfony Endpoint Scanner
+# 🏴‍☠️ Symfony Endpoint Scanner
 
 Busca rutas públicas comunes de aplicaciones Symfony.
 
@@ -6,33 +6,34 @@ Desarrollado por **m10sec (2025)**.
 
 ---
 
-## Descripción
+## 🏴‍☠️ Descripción
 Symfony Endpoint Scanner es una herramienta simple en Python que realiza peticiones HTTP a rutas comunes utilizadas en entornos Symfony. Su propósito es detectar endpoints expuestos como `/_profiler`, `/config.php`, `/admin`, `/login`, entre otros, que pueden representar vectores de ataque si están accesibles.
 
 ---
 
 ## Características
-
-- Basado en `requests`
-- Rutas predefinidas comunes en Symfony (debug, autenticación, APIs, rutas JS)
-- Banner personalizado
-- Modo consola con `argparse`
-- Resultados con códigos HTTP indicativos (200, 301, 302, 403)
+	•	Basado en requests con reintentos (Retry) y pool HTTP.
+	•	Wordlist adicional y paths por CLI.
+	•	HEAD primero (--head-first) y follow redirects (--follow).
+	•	Proxy fácilmente integrable (Burp/ZAP).
+	•	Filtrado de códigos interesantes (--codes) y modo verbose.
+	•	Guardado en JSON o CSV.
+	•	Detección de fingerprints Symfony (p. ej., X-Debug-Token, FOSJsRouting, Encore manifest/entrypoints).
 
 ---
 
-## Instalación
+## 🏴‍☠️ Instalación
 
 ```bash
 # Clonar el repositorio
-$ git clone https://github.com/m10sec/Symfony-Endpoint-Scanner.git
-$ cd Symfony-Endpoint-Scanner
+git clone https://github.com/m10often/Symfony-Endpoint-Scanner.git
+cd Symfony-Endpoint-Scanner
 
-# Crear entorno virtual (opcional)
-$ python3 -m venv venv && source venv/bin/activate
+# (Opcional) Entorno virtual
+python3 -m venv venv && source venv/bin/activate
 
 # Instalar dependencias
-$ pip3 install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 ---
 ## Uso
@@ -86,38 +87,30 @@ python3 SymfonyScanner.py https://target.com -w symfony-common.txt --format csv 
 ---
 
 
-## 🧪 Ejemplo de salida
+## 🏴‍☠️ Ejemplo de salida
 
 ```bash
-==============================================
+====================================================================================
+     ☠️ Symfony Endpoint Scanner v1.3.0 ☠️
+   Busca rutas públicas comunes de Symfony
+       + Smart placeholders & fuzzing
+====================================================================================
 
-     /$$$$$$$$                 /$$                     /$$             /$$    
-    | $$_____/                | $$                    |__/            | $$    
-    | $$       /$$$$$$$   /$$$$$$$  /$$$$$$   /$$$$$$  /$$ /$$$$$$$  /$$$$$$  
-    | $$$$$   | $$__  $$ /$$__  $$ /$$__  $$ /$$__  $$| $$| $$__  $$|_  $$_/  
-    | $$__/   | $$  \ $$| $$  | $$| $$  \ $$| $$  \ $$| $$| $$  \ $$  | $$    
-    | $$      | $$  | $$| $$  | $$| $$  | $$| $$  | $$| $$| $$  | $$  | $$ /$$
-    | $$$$$$$$| $$  | $$|  $$$$$$$| $$$$$$$/|  $$$$$$/| $$| $$  | $$  |  $$$$/
-    |________/|__/  |__/ \_______/| $$____/  \______/ |__/|__/  |__/   \___/  
-                                  | $$                                        
-                                  | $$                                        
-                                  |__/                                        
-    
-       Symfony Endpoint Scanner v1.2.0        
-   Busca rutas públicas comunes de Symfony    
-               by m10sec (2025)               
-==============================================
+☠️ Escaneando endpoints comunes de Symfony en: https://target.com
 
-🔍 Escaneando endpoints comunes de Symfony en: https://target.com 
+[+] [base] https://target.com/_profiler (Status 200) (123 ms) [text/html] | X-Debug-Token presente (Symfony Profiler)
+[-] [base] https://target.com/build/vendor.js (Status 404) (45 ms) [text/html]
+[+] [base] https://target.com/_wdt/abcdef1234 (Status 200) (98 ms) [text/html]
 
-[+] Posible endpoint válido: https://target.com/_profiler (Status: 200)
-[-] No válido: https://target.com/build/vendor.js (Status: 404)
-[+] Posible endpoint válido: https://target.com/login (Status: 403)
+» Lanzando fuzzing dirigido: 12 variantes | hilos=8
+
+[+] [fuzz] https://target.com/_wdt/0000000000000000 (Status 200) (91 ms) [text/html] [parent=/ _wdt/abcdef1234]
+[-] [fuzz] https://target.com/_wdt/deadbeef (Status 404) (87 ms) [text/html] [parent=/ _wdt/abcdef1234]
 
 ```
 ---
 
-## 🙌 Apóyame
+## 🏴‍☠️ Apóyame
 
 Si esta herramienta te ha sido útil o quieres apoyar futuros desarrollos, puedes invitarme un café ☕ o hacer una donación. ¡Cualquier apoyo cuenta!
 
@@ -125,7 +118,7 @@ Si esta herramienta te ha sido útil o quieres apoyar futuros desarrollos, puede
 
 ---
 
-## 📬 Contacto y redes
+## 🏴‍☠️ Contacto y redes
 
 - 💌 Correo: [m10sec@proton.me](mailto:m10sec@proton.me)
 - 🌐 Blog: [https://m10.com.mx](https://m10.com.mx)
@@ -135,11 +128,11 @@ Si esta herramienta te ha sido útil o quieres apoyar futuros desarrollos, puede
 
 ---
 
-## 🛡️ Filosofía
+## 🏴‍☠️ Filosofía
 
 Creo en un mundo donde los usuarios tienen control sobre su privacidad. Esta herramienta nace desde la trinchera del pentesting real, con amor por la libertad digital y el hacking con propósito.
 
 ---
 
 ⭐ Si te gustó este proyecto, dale una estrella en GitHub y compártelo con tu comunidad.
-
+Si este proyecto te sirve, puedes invitarme un café ☕
