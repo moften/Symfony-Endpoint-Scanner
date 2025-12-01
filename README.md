@@ -7,7 +7,10 @@ Desarrollado por **m10sec (2025)**.
 ---
 
 ## 🏴‍☠️ Descripción
-Symfony Endpoint Scanner es una herramienta simple en Python que realiza peticiones HTTP a rutas comunes utilizadas en entornos Symfony. Su propósito es detectar endpoints expuestos como `/_profiler`, `/config.php`, `/admin`, `/login`, entre otros, que pueden representar vectores de ataque si están accesibles.
+Symfony Endpoint Scanner es una herramienta avanzada escrita en Python diseñada para analizar de forma exhaustiva servidores web que potencialmente ejecutan Symfony o frameworks similares.
+El script realiza miles de peticiones HTTP controladas, detecta endpoints expuestos, identifica artefactos de desarrollo, localiza archivos de backup y dumps filtrados, y detecta huellas de tecnologías que podrían representar una superficie de ataque crítica.
+
+Además, implementa fuzzing inteligente sobre plantillas parametrizadas para descubrir rutas internas o endpoints ocultos.
 
 ---
 
@@ -36,7 +39,7 @@ python3 -m venv venv && source venv/bin/activate
 pip3 install -r requirements.txt
 ```
 ---
-## Uso
+## 🏴‍☠️ Uso
 
 # [+] Escaneo rápido de rutas conocidas:
 
@@ -44,19 +47,47 @@ pip3 install -r requirements.txt
 python3 SymfonyScanner.py https://example.com
 ```
 
+# [+] Mostrar solo resultados que coincidan con ciertos códigos y, si quieres ver también no coincidentes, añade --verbose.
+```bash
+python3 SymfonyScanner.py https://example.com --codes 200,301,302,403 --verbose
+```
+
 # [+] Escaneo con wordlist adicional y seguimiento de redirecciones:
 
 ```bash
 python3 SymfonyScanner.py https://example.com -w rutas.txt --follow
 ```
-# Minimizar ruido en clientes:
+
+# [+] Escaneo con limitación de tasa y guardar resultados:
+
+```bash
+python3 SymfonyScanner.py https://example.com --rps 4 --threads 20 --format json --out host_scan.json --codes 200,301,302 --save-all
+```
+
+# [+] inimizar ruido en clientes:
 
 ```bash
 --head-first --codes 200,301,302,401,403
 ```
-Inspección en BurpSuite:
+# [+] Inspección en BurpSuite (proxy):
+
 ```bash
 --proxy http://127.0.0.1:8080
+--insecure    # Desactiva verificación TLS
+```
+```bash
+python3 SymfonyScanner.py https://example.com --proxy http://127.0.0.1:8080
+```
+
+# [+] Probar HEAD antes de GET (más corto en respuestas que soportan HEAD)
+```bash
+python3 SymfonyScanner.py https://example.com --head-first
+```
+
+# [+] Ralentizar por petición (delay) — por hilo
+```bash
+# cada hilo espera ~100ms antes de cada petición
+python scanner.py https://example.com --threads 20 --delay 0.1
 ```
 
 # Opciones:
@@ -84,6 +115,7 @@ python3 SymfonyScanner.py https://target.com --head-first --codes 200,301,302,40
 ```bash
 python3 SymfonyScanner.py https://target.com -w symfony-common.txt --format csv --out resultados.csv
 ```
+
 ---
 
 
@@ -96,7 +128,7 @@ python3 SymfonyScanner.py https://target.com -w symfony-common.txt --format csv 
        + Smart placeholders & fuzzing
 ====================================================================================
 
-☠️ Escaneando endpoints comunes de Symfony en: https://target.com
+☠️ Escaneando endpoints comunes de Symfony en: https://target.com 
 
 [+] [base] https://target.com/_profiler (Status 200) (123 ms) [text/html] | X-Debug-Token presente (Symfony Profiler)
 [-] [base] https://target.com/build/vendor.js (Status 404) (45 ms) [text/html]

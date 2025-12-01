@@ -7,13 +7,16 @@ import json
 import sys
 import time
 import re
+import threading
+import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from requests.exceptions import SSLError, ConnectionError
 
 try:
     from colorama import Fore, Style, init as colorama_init
@@ -30,16 +33,23 @@ from typing import Optional, List, Dict, Any, Set, Tuple
 # =========================
 
 COMMON_PATHS: List[str] = [
-    # JS Routing & FOSJsRoutingBundle
+    # ... (misma lista que antes; truncated here for brevity in this snippet)
     "/js/fos_js_routes.json",
+    "/.docs/vams-api.md",
+    "/.docs/vams-webhooks.md",
+    "/Readme.md",
+    "/_babel.config.js",
+    "/bitbucket-pipelines.yml",
+    "/deploy.sh",
+    "/phpunit.xml.dist",
+    "/symfony.lock",
+    "/webpack.config.js",
     "/js/routes.json",
     "/js/routing.json",
     "/js/fos_js_routes.js",
     "/js/routing.js",
     "/bundles/fosjsrouting/js/router.js",
     "/bundles/fosjsrouting/js/router.min.js",
-
-    # Symfony debug / dev tools (plantillas incluidas)
     "/_wdt/{token}",
     "/_profiler/",
     "/_profiler/search",
@@ -53,8 +63,6 @@ COMMON_PATHS: List[str] = [
     "/_profiler/{token}/exception",
     "/_profiler/{token}/exception.css",
     "/_profiler/{token}/search/results",
-
-    # Rutas de aplicación (app_*)
     "/account",
     "/movements",
     "/download/{id}",
@@ -71,21 +79,15 @@ COMMON_PATHS: List[str] = [
     "/verify-exchange-code",
     "/event/{slug}",
     "/product/{id}",
-
-    # Reset password
     "/reset-password",
     "/reset-password/check-email",
     "/reset-password/reset/{token}",
-
-    # Webpack Encore & frontend assets
     "/build/manifest.json",
     "/build/entrypoints.json",
     "/build/runtime.js",
     "/build/app.js",
     "/build/app.css",
     "/build/vendor.js",
-
-    # Autenticación y paneles comunes
     "/login",
     "/logout",
     "/admin",
@@ -94,8 +96,6 @@ COMMON_PATHS: List[str] = [
     "/user/login",
     "/dashboard",
     "/easyadmin",
-
-    # API comunes (REST, GraphQL, Swagger, JWT)
     "/api/users",
     "/api/v1/users",
     "/api/v1/token",
@@ -111,8 +111,6 @@ COMMON_PATHS: List[str] = [
     "/api/doc",
     "/api/doc.json",
     "/api/v1/doc",
-
-    # Otros posibles accesos
     "/debug/",
     "/adminer",
     "/_fragment",
@@ -136,6 +134,8 @@ COMMON_PATHS: List[str] = [
     "/bundles/easyadmin/",
     "/bundles/sonataadmin/",
     "/.env",
+    "/.env.test",
+    "/.env.example",
     "/.env.local",
     "/.env.prod",
     "/.git/HEAD",
@@ -153,8 +153,6 @@ COMMON_PATHS: List[str] = [
     "npm-shrinkwrap.json",
     "node_modules/",
     "/maintenance",
-
-    # FOSUserBundle
     "/register",
     "/register/check-email",
     "/register/confirmed",
@@ -168,8 +166,6 @@ COMMON_PATHS: List[str] = [
     "/profile/show",
     "/profile/change-password",
     "/confirm/abcdef1234",
-
-    # SymfonyCasts bundles
     "/reset-password",
     "/reset-password/reset",
     "/reset-password/reset/abcdef1234",
@@ -179,8 +175,6 @@ COMMON_PATHS: List[str] = [
     "/2fa",
     "/2fa_check",
     "/2fa/qr-code",
-
-    # API Platform / Swagger / GraphQL
     "/api",
     "/api/docs",
     "/api/docs.jsonld",
@@ -192,8 +186,6 @@ COMMON_PATHS: List[str] = [
     "/graphql",
     "/graphiql",
     "/graphql-playground",
-
-    # Auth y JWT/OAuth
     "/login_check",
     "/api/login_check",
     "/token/refresh",
@@ -204,16 +196,12 @@ COMMON_PATHS: List[str] = [
     "/oauth/token",
     "/oauth/refresh_token",
     "/connect/",
-
-    # Admin bundles
     "/easyadmin",
     "/admin/logout",
     "/admin/resetting/request",
     "/admin/resetting/reset/abcdef",
     "/adminer",
     "/adminer.php",
-
-    # Dev/Debug
     "/_profiler/abcdef",
     "/_wdt/abcdef",
     "/_errors/500",
@@ -226,8 +214,6 @@ COMMON_PATHS: List[str] = [
     "/vendor/",
     "/composer.lock",
     "/symfony.lock",
-
-    # Salud/Monitoreo
     "/health",
     "/healthz",
     "/ready",
@@ -235,16 +221,12 @@ COMMON_PATHS: List[str] = [
     "/ping",
     "/_ping",
     "/metrics",
-
-    # Archivos de sitio
     "/robots.txt",
     "/sitemap.xml",
     "/sitemap_index.xml",
     "/sitemap.xml.gz",
     "/sitemap1.xml",
     "/sitemap2.xml",
-
-    # Well-known
     "/.well-known/security.txt",
     "/.well-known/change-password",
     "/.well-known/openid-configuration",
@@ -254,39 +236,30 @@ COMMON_PATHS: List[str] = [
 ]
 
 BACKUP_PATHS: List[str] = [
-    # Directorios típicos de backups
     "/backup/", "/backups/", "/_backup/", "/_backups/",
     "/var/backups/", "/storage/backups/", "/tmp/backups/",
     "/db/backup/", "/database/backup/", "/mysql/backup/", "/pg/backup/",
-
-    # Volcados frecuentes (DB / exports)
     "/dump.sql", "/dump.sql.gz", "/dump.sql.zip", "/dump.tar.gz",
     "/database.sql", "/database.sql.gz", "/database.sql.zip",
     "/db.sql", "/db.sql.gz", "/db.sql.zip",
     "/export.sql", "/export.sql.gz",
     "/mysql.sql", "/postgres.sql",
     "/backup.sql", "/backup.sql.gz", "/backup.tar.gz",
-
-    # Copias de .env y config
     "/.env.bak", "/.env.backup", "/.env.old", "/.env~",
     "/.env.local.bak", "/.env.prod.bak",
     "/parameters.yml.bak", "/parameters.yml~", "/parameters.yaml.bak",
     "/config/packages/prod/framework.yaml.bak",
     "/composer.json.bak", "/composer.lock.bak",
     "/symfony.lock.bak", "/.htaccess.bak", "/.htaccess~",
-
-    # Archivos empaquetados comunes
     "/backup.zip", "/backups.zip", "/site-backup.zip",
     "/backup.tar", "/backup.tar.gz", "/backup.tgz",
     "/full-backup.zip", "/public-backup.zip", "/app-backup.zip",
-
-    # Copias por editores/CI
     "/.env.save", "/.env.tmp", "/.env.swp", "/.env.swo",
     "/parameters.yml.orig", "/parameters.yml.save",
     "/.env.copy", "/.env.tmp.bak",
 ]
 
-# Generador de candidatos de backup (igual al tuyo)
+# Generador de candidatos de backup
 SENSITIVE_BASENAMES = [
     ".env", ".env.local", ".env.prod",
     "composer.json", "composer.lock", "symfony.lock",
@@ -328,7 +301,6 @@ def gen_backup_candidates() -> List[str]:
 
 PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
-# Semillas (primer intento) por placeholder
 SEED_VALUES: Dict[str, str] = {
     "id": "1",
     "token": "abcdef1234",
@@ -339,14 +311,13 @@ SEED_VALUES: Dict[str, str] = {
     "fontName": "OpenSans-Regular",
 }
 
-# Conjuntos de fuzz por placeholder (limitados, pensados para “descubrir más”)
 FUZZ_CATALOG: Dict[str, List[str]] = {
     "id": ["1","2","3","5","10","25","50","100","999","0","-1"],
     "token": [
         "abcdef1234",
         "deadbeef",
         "0123456789abcdef",
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",   # 32 a
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "12345678",
         "0000000000000000",
         "cafebabedeadbeef",
@@ -364,11 +335,10 @@ def find_placeholders(p: str) -> List[str]:
 def substitute(p: str, mapping: Dict[str, str]) -> str:
     def _rep(m: re.Match) -> str:
         key = m.group(1)
-        return mapping.get(key, m.group(0))  # si no hay valor, deja {key}
+        return mapping.get(key, m.group(0))
     return PLACEHOLDER_RE.sub(_rep, p)
 
 def initial_variant_for(p: str) -> Tuple[str, List[str]]:
-    """Devuelve (ruta_sustituida, placeholders_detectados) usando SEED_VALUES."""
     keys = find_placeholders(p)
     if not keys:
         return p, []
@@ -376,18 +346,15 @@ def initial_variant_for(p: str) -> Tuple[str, List[str]]:
     return substitute(p, mapping), keys
 
 def gen_fuzz_variants(p_template: str, keys: List[str], limit: int) -> List[str]:
-    """Genera variantes combinando los catálogos de cada placeholder (recortado por limit)."""
-    # Construye una lista de listas de valores a probar por cada key
     vals_by_key: List[Tuple[str, List[str]]] = []
     for k in keys:
         vals = FUZZ_CATALOG.get(k, [SEED_VALUES.get(k, "1")])
         vals_by_key.append((k, vals[:limit]))
 
-    # Producto cartesiano (pero recortado por limit total aproximado)
     variants: List[str] = []
     def _recurse(idx: int, current: Dict[str, str]):
         nonlocal variants
-        if len(variants) >= max(limit, 1) * len(keys):  # bound suave
+        if len(variants) >= max(limit, 1) * len(keys):
             return
         if idx == len(vals_by_key):
             variants.append(substitute(p_template, current))
@@ -398,7 +365,6 @@ def gen_fuzz_variants(p_template: str, keys: List[str], limit: int) -> List[str]
             _recurse(idx + 1, current)
         current.pop(k, None)
     _recurse(0, {})
-    # Quitar duplicados conservando orden
     seen=set(); out=[]
     for v in variants:
         if v not in seen:
@@ -426,11 +392,29 @@ def banner() -> None:
 ░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░░▒▓█▓▒░       ░▒▓██████▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▒░
     """
     print(ascii_art)
-    print("     ☠️ Symfony Endpoint Scanner v1.3.0 ☠️     ")
-    print("   Busca rutas públicas comunes de Symfony    ")
-    print("       + Smart placeholders & fuzzing         ")
-    print("             🏴‍☠️ by m10sec (2025) 🏴‍☠️            ")
+    print("     ☠️ Symfony Endpoint Scanner v1.4.0 ☠️     ")
+    print("   Escaneo Symfony + fallback HTTP + dual-scan   ")
     print("===================================================================================\n")
+
+# ------------------------
+# Rate limiter simple
+# ------------------------
+class RateLimiter:
+    def __init__(self, rps: float):
+        if rps <= 0:
+            raise ValueError("rps must be > 0")
+        self.interval = 1.0 / float(rps)
+        self._lock = threading.Lock()
+        self._next_allowed = time.monotonic()
+
+    def acquire(self) -> None:
+        with self._lock:
+            now = time.monotonic()
+            if now < self._next_allowed:
+                to_sleep = self._next_allowed - now
+                time.sleep(to_sleep)
+                now = time.monotonic()
+            self._next_allowed = now + self.interval
 
 def build_session(timeout: int, retries: int, backoff: float, verify_tls: bool, proxy: Optional[str]) -> requests.Session:
     sess = requests.Session()
@@ -448,6 +432,11 @@ def build_session(timeout: int, retries: int, backoff: float, verify_tls: bool, 
         sess.proxies = {"http": proxy, "https": proxy}
     sess.headers.update(DEFAULT_HEADERS)
     sess.request_timeout = timeout  # type: ignore[attr-defined]
+
+    sess._rate_limiter = None  # type: ignore[attr-defined]
+    sess._request_delay = 0.0  # type: ignore[attr-defined]
+    sess._request_jitter = 0.0  # type: ignore[attr-defined]
+
     return sess
 
 def parse_headers(headers_list: List[str]) -> Dict[str, str]:
@@ -483,43 +472,261 @@ def symfony_fingerprints(resp: requests.Response, body_sample: Optional[str]) ->
         pass
     return hints
 
-def fetch(session: requests.Session, base: str, path: str, follow: bool, head_first: bool, extra_headers: Dict[str, str], head_fallback_get: bool = True) -> Dict[str, Any]:
-    url = urljoin(base, path)
+# ------------------------
+# Host status tracking (thread-safe)
+# ------------------------
+host_status_lock = threading.Lock()
+host_status: Dict[str, str] = {}  # netloc -> one of: HTTPS-only, HTTP-only, Dual, HTTPS-broken-API, Unknown
+
+def set_host_status(netloc: str, status: str) -> None:
+    with host_status_lock:
+        prev = host_status.get(netloc)
+        # Prefer statuses with more information, but allow overrides in some cases
+        if prev == status:
+            return
+        # If switching from Unknown -> something, set it
+        if not prev or prev == "Unknown":
+            host_status[netloc] = status
+            return
+        # If previously HTTPS-only and now HTTP also works, set Dual
+        if prev == "HTTPS-only" and status == "HTTP-only":
+            host_status[netloc] = "Dual"
+            return
+        if prev == "HTTP-only" and status == "HTTPS-only":
+            host_status[netloc] = "Dual"
+            return
+        # If HTTPS-only and now we detect HTTPS-broken-API but HTTP works => HTTPS-broken-API
+        if status == "HTTPS-broken-API":
+            host_status[netloc] = status
+            return
+        # Otherwise keep previous
+        host_status[netloc] = status
+
+def get_host_status(netloc: str) -> str:
+    with host_status_lock:
+        return host_status.get(netloc, "Unknown")
+
+# ------------------------
+# Probe logic: detect schemes alive for host
+# ------------------------
+def probe_host(session: requests.Session, netloc: str, follow: bool, head_first: bool) -> None:
+    """
+    Probe root (/) on https and http for a given netloc and register host_status.
+    """
+    https_url = urlunparse(("https", netloc, "/", "", "", ""))
+    http_url = urlunparse(("http", netloc, "/", "", "", ""))
+    https_ok = False
+    http_ok = False
+    https_broken_api = False
+
+    # Try HTTPS
+    try:
+        if head_first:
+            r = session.head(https_url, allow_redirects=follow, timeout=session.request_timeout)
+            if r.status_code in (405, 501):
+                r = session.get(https_url, allow_redirects=follow, timeout=session.request_timeout)
+        else:
+            r = session.get(https_url, allow_redirects=follow, timeout=session.request_timeout)
+        if r.status_code < 500:
+            https_ok = True
+        else:
+            https_broken_api = True
+    except Exception:
+        https_ok = False
+
+    # Try HTTP :)
+    try:
+        if head_first:
+            r2 = session.head(http_url, allow_redirects=follow, timeout=session.request_timeout)
+            if r2.status_code in (405, 501):
+                r2 = session.get(http_url, allow_redirects=follow, timeout=session.request_timeout)
+        else:
+            r2 = session.get(http_url, allow_redirects=follow, timeout=session.request_timeout)
+        if r2.status_code < 500:
+            http_ok = True
+    except Exception:
+        http_ok = False
+
+    if https_ok and http_ok:
+        set_host_status(netloc, "Dual")
+    elif https_ok and not http_ok:
+        set_host_status(netloc, "HTTPS-only")
+    elif http_ok and not https_ok:
+        set_host_status(netloc, "HTTP-only")
+    elif https_broken_api and http_ok:
+        set_host_status(netloc, "HTTPS-broken-API")
+    else:
+        set_host_status(netloc, "Unknown")
+
+# ------------------------
+# Enhanced fetch with fallback to HTTP when appropriate
+# ------------------------
+def fetch(session: requests.Session, base: str, path: str, follow: bool, head_first: bool, extra_headers: Dict[str, str], head_fallback_get: bool = True, prefer_http: bool = False) -> Dict[str, Any]:
+    """
+    base should be a scheme+netloc (e.g. https://example.com) or a full base URL without trailing slash.
+    This function respects session._rate_limiter and session._request_delay/_request_jitter.
+    If prefer_http=True it will try http before https for bases that are ambiguous.
+    It implements a one-time fallback from https -> http on certain failures.
+    """
+    # Rate limiting
+    rl = getattr(session, "_rate_limiter", None)
+    if rl is not None:
+        try:
+            rl.acquire()
+        except Exception:
+            pass
+
+    # Per-request delay + jitter
+    try:
+        d = float(getattr(session, "_request_delay", 0.0) or 0.0)
+        j = float(getattr(session, "_request_jitter", 0.0) or 0.0)
+        if d > 0 or j > 0:
+            if j > 0:
+                jitter = random.uniform(-j, j)
+                to_sleep = max(0.0, d + jitter)
+            else:
+                to_sleep = d
+            if to_sleep > 0:
+                time.sleep(to_sleep)
+    except Exception:
+        pass
+
+    # Build URL
+    url = urljoin(base.rstrip("/") + "/", path.lstrip("/"))
+    parsed = urlparse(url)
+    netloc = parsed.netloc
+    scheme = parsed.scheme
+
     t0 = time.time()
+    tried_http_fallback = False
+
+    def _do_request(u: str):
+        try:
+            if head_first:
+                resp = session.head(u, allow_redirects=follow, timeout=session.request_timeout, headers=extra_headers)  # type: ignore[attr-defined]
+                if resp.status_code in (405, 501) or ("content-type" not in resp.headers and head_fallback_get):
+                    resp = session.get(u, allow_redirects=follow, timeout=session.request_timeout, headers=extra_headers)  # type: ignore[attr-defined]
+            else:
+                resp = session.get(u, allow_redirects=follow, timeout=session.request_timeout, headers=extra_headers)  # type: ignore[attr-defined]
+            return resp
+        except Exception as e:
+            raise
+
     try:
         resp = None
-        if head_first:
-            resp = session.head(url, allow_redirects=follow, timeout=session.request_timeout, headers=extra_headers)  # type: ignore[attr-defined]
-            if resp.status_code in (405, 501) or ("content-type" not in resp.headers and head_fallback_get):
-                resp = None
-        if resp is None:
-            resp = session.get(url, allow_redirects=follow, timeout=session.request_timeout, headers=extra_headers)  # type: ignore[attr-defined]
+        # Possibly prefer HTTP
+        host_state = get_host_status(netloc)
+        # If prefer_http flag enabled globally or host is HTTP-only, use http first
+        if prefer_http or host_state == "HTTP-only":
+            alt_url = urlunparse(("http", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+            try:
+                resp = _do_request(alt_url)
+                set_host_status(netloc, "HTTP-only" if get_host_status(netloc) == "Unknown" else get_host_status(netloc))
+                url_used = alt_url
+            except Exception:
+                # try original
+                resp = _do_request(url)
+                url_used = url
+        else:
+            # default: try provided scheme first
+            try:
+                resp = _do_request(url)
+                url_used = url
+            except Exception as e:
+                # If original was https, attempt HTTP fallback once
+                if scheme == "https":
+                    # avoid duplicate attempts if host probe already said HTTP dead
+                    http_url = urlunparse(("http", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+                    try:
+                        resp = _do_request(http_url)
+                        tried_http_fallback = True
+                        set_host_status(netloc, "HTTP-only" if get_host_status(netloc) in ("Unknown","HTTPS-broken-API") else get_host_status(netloc))
+                        url_used = http_url
+                    except Exception:
+                        raise
+                else:
+                    raise
+
         dt = time.time() - t0
 
         body_sample: Optional[str] = None
         try:
             ctype = resp.headers.get("Content-Type", "")
-            if ctype.startswith("text/") or "json" in ctype:
+            if ctype and (ctype.startswith("text/") or "json" in ctype):
                 body_sample = resp.text[:1000]
         except Exception:
             body_sample = None
 
-        hints = symfony_fingerprints(resp, body_sample)
+        # If response indicates server error (5xx) and original scheme was https and we didn't try http fallback yet,
+        # try http once (to detect HTTPS-broken-API)
+        if resp is not None and resp.status_code >= 500 and scheme == "https" and not tried_http_fallback and get_host_status(netloc) != "HTTP-only":
+            http_url = urlunparse(("http", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+            try:
+                r2 = _do_request(http_url)
+                # if HTTP works better, mark accordingly
+                if r2.status_code < 500:
+                    set_host_status(netloc, "HTTPS-broken-API")
+                    # prefer returning the HTTP result (so it's visible)
+                    resp = r2
+                    url_used = http_url
+            except Exception:
+                pass
+
+        # If succeeded, update host status if unknown
+        if resp is not None:
+            if scheme == "https" and resp.status_code < 500 and get_host_status(netloc) in ("Unknown",):
+                # if http also works, probe_host will later set Dual; we set HTTPS-only tentatively
+                set_host_status(netloc, "HTTPS-only")
+            if scheme == "http" and resp.status_code < 500 and get_host_status(netloc) in ("Unknown",):
+                set_host_status(netloc, "HTTP-only")
+
+        hints = symfony_fingerprints(resp, body_sample) if resp is not None else []
         result: Dict[str, Any] = {
-            "url": url,
+            "url": url_used,
             "path": path,
-            "status": resp.status_code,
-            "reason": getattr(resp, "reason", None),
-            "content_type": resp.headers.get("Content-Type"),
-            "length": resp.headers.get("Content-Length"),
-            "location": resp.headers.get("Location"),
+            "status": resp.status_code if resp is not None else None,
+            "reason": getattr(resp, "reason", None) if resp is not None else None,
+            "content_type": resp.headers.get("Content-Type") if resp is not None else None,
+            "length": resp.headers.get("Content-Length") if resp is not None else None,
+            "location": resp.headers.get("Location") if resp is not None else None,
             "elapsed_ms": int(dt * 1000),
             "hints": hints,
         }
         return result
     except requests.RequestException as e:
+        # If it's a requests exception and original scheme was https, try http fallback once
+        if scheme == "https" and not tried_http_fallback and get_host_status(netloc) != "HTTP-only":
+            http_url = urlunparse(("http", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+            try:
+                r2 = _do_request(http_url)
+                dt = time.time() - t0
+                body_sample = None
+                try:
+                    ctype = r2.headers.get("Content-Type", "")
+                    if ctype and (ctype.startswith("text/") or "json" in ctype):
+                        body_sample = r2.text[:1000]
+                except Exception:
+                    body_sample = None
+                hints = symfony_fingerprints(r2, body_sample)
+                set_host_status(netloc, "HTTP-only")
+                return {
+                    "url": http_url,
+                    "path": path,
+                    "status": r2.status_code,
+                    "reason": getattr(r2, "reason", None),
+                    "content_type": r2.headers.get("Content-Type"),
+                    "length": r2.headers.get("Content-Length"),
+                    "location": r2.headers.get("Location"),
+                    "elapsed_ms": int(dt * 1000),
+                    "hints": hints,
+                }
+            except Exception:
+                pass
         return {"url": url, "path": path, "error": str(e)}
 
+# ------------------------
+# Remaining helpers (load_wordlist, save_results) - unchanged
+# ------------------------
 def load_wordlist(path: Optional[str]) -> List[str]:
     if not path:
         return []
@@ -559,7 +766,7 @@ def save_results(results: List[Dict[str, Any]], out_path: str, fmt: str) -> None
 def main() -> None:
     banner()
     parser = argparse.ArgumentParser(description="Escanea rutas públicas típicas de Symfony (rápido, concurrente, con smart fuzz).")
-    parser.add_argument("url", help="URL base (ej: https://example.com)")
+    parser.add_argument("url", help="URL base (ej: https://example.com) — admite esquema http/https")
     parser.add_argument("-w", "--wordlist", help="Archivo con rutas adicionales (una por línea).")
     parser.add_argument("-p", "--paths", nargs="*", default=[], help="Rutas extra separadas por espacios (ej: /health /metrics).")
     parser.add_argument("--codes", help="Códigos permitidos (coma, ej: 200,301,302,403). Por defecto: 200,301,302,401,403")
@@ -577,18 +784,22 @@ def main() -> None:
     parser.add_argument("--verbose", action="store_true", help="Mostrar también respuestas que no coincidan con --codes.")
     parser.add_argument("--save-all", action="store_true", help="Guardar todos los resultados incluso si --codes está activo.")
 
-    # === NUEVOS FLAGS ===
-    parser.add_argument("--smart-fuzz", action="store_true",
-                        help="Si un endpoint con placeholders devuelve 200, fuzzear valores de prueba (id, token, slug, etc.).")
+    # NEW FLAGS
+    parser.add_argument("--smart-fuzz", action="store_true", help="Si un endpoint con placeholders devuelve 200, fuzzear valores de prueba (id, token, slug, etc.).")
     parser.add_argument("--fuzz-limit", type=int, default=8, help="Máximo de combinaciones por placeholder (aprox).")
     parser.add_argument("--fuzz-threads", type=int, default=8, help="Hilos para fuzzing (aparte de --threads).")
+    parser.add_argument("--delay", type=float, default=0.0, help="Delay fijo por petición en segundos (por hilo). Ej: 0.1")
+    parser.add_argument("--jitter", type=float, default=0.0, help="Jitter +/- (s) aplicado a --delay, para evitar patrones exactos.")
+    parser.add_argument("--rps", type=float, default=0.0, help="Requests por segundo global máximo (ej: 5). Si >0 se aplica rate limiter global.")
+    parser.add_argument("--prefer-http", action="store_true", help="Probar HTTP antes que HTTPS (cuando tenga sentido).")
+    parser.add_argument("--dual", action="store_true", help="Probar ambos esquemas (https y http) para cada ruta (duplica peticiones).")
 
     args = parser.parse_args()
 
-    base_url = args.url.rstrip("/")
-    if not base_url.startswith(("http://", "https://")):
+    base_input = args.url.rstrip("/")
+    if not base_input.startswith(("http://", "https://")):
         print(f"{Fore.YELLOW}[!] La URL no contiene esquema, asumiendo https://{Style.RESET_ALL}")
-        base_url = "https://" + base_url
+        base_input = "https://" + base_input
 
     allow_codes: Set[int] = set()
     if args.codes:
@@ -610,22 +821,73 @@ def main() -> None:
     if extra_headers:
         session.headers.update(extra_headers)
 
+    # Configure rate limiter and delay
+    if getattr(args, "rps", 0.0) and args.rps > 0:
+        try:
+            session._rate_limiter = RateLimiter(args.rps)  # type: ignore[attr-defined]
+            print(f"{Fore.YELLOW}[!] Rate limiter global activado: {args.rps} req/s{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.YELLOW}[!] No se pudo inicializar rate limiter: {e}{Style.RESET_ALL}")
+
+    session._request_delay = float(getattr(args, "delay", 0.0) or 0.0)  # type: ignore[attr-defined]
+    session._request_jitter = float(getattr(args, "jitter", 0.0) or 0.0)  # type: ignore[attr-defined]
+    if session._request_delay > 0 or session._request_jitter > 0:
+        print(f"{Fore.YELLOW}[!] Delay por petición: {session._request_delay}s ±{session._request_jitter}s{Style.RESET_ALL}")
+
     # --- Preparar objetivos: expandimos plantillas a una variante inicial ---
     raw_targets = COMMON_PATHS + BACKUP_PATHS + gen_backup_candidates() + args.paths + load_wordlist(args.wordlist)
-    # de-dup conservando orden
     seen = set(); raw_targets = [t for t in raw_targets if not (t in seen or seen.add(t))]
 
-    # Cada objetivo será un dict con metadata
+    # Build per-host list and do probes
+    parsed_base = urlparse(base_input)
+    base_netloc = parsed_base.netloc
+    base_scheme = parsed_base.scheme
+
+    # For simplicity we only probe the specified host. If you pass multiple hosts, adapt accordingly.
+    print(f"{Fore.CYAN}» Probeando esquemas para host: {base_netloc}{Style.RESET_ALL}")
+    # set Unknown initially
+    set_host_status(base_netloc, "Unknown")
+    try:
+        probe_host(session, base_netloc, args.follow, args.head_first)
+    except Exception:
+        pass
+    print(f"{Fore.CYAN}» Estado detectado: {get_host_status(base_netloc)}{Style.RESET_ALL}\n")
+
+    # Build scan_items: each item includes base (scheme+netloc), path, template, keys, phase
     ScanItem = Dict[str, Any]
     scan_items: List[ScanItem] = []
     for p in raw_targets:
         sub, keys = initial_variant_for(p)
-        if keys:
-            scan_items.append({"template": p, "path": sub, "keys": keys, "phase": "base"})
+        if args.dual:
+            # create both https and http base entries
+            https_base = urlunparse(("https", base_netloc, "", "", "", ""))
+            http_base = urlunparse(("http", base_netloc, "", "", "", ""))
+            if keys:
+                scan_items.append({"base": https_base, "template": p, "path": sub, "keys": keys, "phase": "base"})
+                scan_items.append({"base": http_base, "template": p, "path": sub, "keys": keys, "phase": "base"})
+            else:
+                scan_items.append({"base": https_base, "template": None, "path": p, "keys": [], "phase": "base"})
+                scan_items.append({"base": http_base, "template": None, "path": p, "keys": [], "phase": "base"})
         else:
-            scan_items.append({"template": None, "path": p, "keys": [], "phase": "base"})
+            # choose base according to input scheme or prefer-http flag or host probe
+            chosen_scheme = base_scheme
+            host_state = get_host_status(base_netloc)
+            if args.prefer_http:
+                chosen_scheme = "http"
+            else:
+                # if host probe said HTTP-only, use http; if HTTPS-only, use https; else use user input
+                if host_state == "HTTP-only":
+                    chosen_scheme = "http"
+                elif host_state == "HTTPS-only":
+                    chosen_scheme = "https"
+                # else keep base_scheme
+            chosen_base = urlunparse((chosen_scheme, base_netloc, "", "", "", ""))
+            if keys:
+                scan_items.append({"base": chosen_base, "template": p, "path": sub, "keys": keys, "phase": "base"})
+            else:
+                scan_items.append({"base": chosen_base, "template": None, "path": p, "keys": [], "phase": "base"})
 
-    print(f"☠️ Escaneando endpoints comunes de Symfony en: {Fore.CYAN}{base_url}{Style.RESET_ALL}")
+    print(f"☠️ Escaneando endpoints comunes de Symfony en: {Fore.CYAN}{base_input}{Style.RESET_ALL}")
     print(f"☠️ Objetivos base: {len(scan_items)} | Hilos: {args.threads} | Timeout: {args.timeout}s\n")
 
     results: List[Dict[str, Any]] = []
@@ -636,7 +898,7 @@ def main() -> None:
     # Ejecutamos fase base
     with ThreadPoolExecutor(max_workers=args.threads) as ex:
         future_map = {ex.submit(
-            fetch, session, base_url, it["path"], args.follow, args.head_first, extra_headers
+            fetch, session, it["base"], it["path"], args.follow, args.head_first, extra_headers, True, args.prefer_http
         ): it for it in scan_items}
 
         fuzz_queue: List[ScanItem] = []
@@ -652,7 +914,7 @@ def main() -> None:
 
             if "error" in r:
                 err_count += 1
-                print(f"{Fore.RED}[!] Error{Style.RESET_ALL} {r['url']} => {r['error']}")
+                print(f"{Fore.RED}[!] Error{Style.RESET_ALL} {r.get('url','?')} => {r['error']}")
                 continue
 
             code = r.get("status")
@@ -675,26 +937,22 @@ def main() -> None:
             phase = f"[{r.get('phase')}]" if r.get("phase") else ""
 
             sign = "[+]" if interesting else "[-]"
-            print(f"{color}{sign} {phase} {r['url']} (Status {code}){ms}{ctype}{size}{loc}{hints}{Style.RESET_ALL}")
+            print(f"{color}{sign} {phase} {r.get('url','?')} (Status {code}){ms}{ctype}{size}{loc}{hints}{Style.RESET_ALL}")
 
-            # === Programar fuzzing si aplica ===
-            # Regla: solo si --smart-fuzz, hubo 200 y la ruta proviene de plantilla con placeholders
+            # Programar fuzzing si aplica
             if args.smart_fuzz and code == 200 and it.get("template") and it.get("keys"):
-                # Generar variantes extra limitadas
                 variants = gen_fuzz_variants(it["template"], it["keys"], args.fuzz_limit)
-                # Evitar incluir la ya usada en base
-                base_used = it["path"]
-                variants = [v for v in variants if v != base_used]
-                # Encolar
+                base_used = it["base"]
+                variants = [v for v in variants if v != it["path"]]
                 for v in variants:
-                    fuzz_queue.append({"template": it["template"], "path": v, "keys": it["keys"], "phase": "fuzz", "parent": base_used})
+                    fuzz_queue.append({"base": base_used, "template": it["template"], "path": v, "keys": it["keys"], "phase": "fuzz", "parent": it["path"]})
 
-    # Ejecutar fuzzing (si se generó)
+    # Ejecutar fuzzing
     if args.smart_fuzz and fuzz_queue:
         print(f"\n{Fore.MAGENTA}» Lanzando fuzzing dirigido:{Style.RESET_ALL} {len(fuzz_queue)} variantes | hilos={args.fuzz_threads}\n")
         with ThreadPoolExecutor(max_workers=args.fuzz_threads) as ex2:
             future_map2 = {ex2.submit(
-                fetch, session, base_url, it["path"], args.follow, args.head_first, extra_headers
+                fetch, session, it["base"], it["path"], args.follow, args.head_first, extra_headers, True, args.prefer_http
             ): it for it in fuzz_queue}
 
             for fut in as_completed(future_map2):
@@ -708,7 +966,7 @@ def main() -> None:
 
                 if "error" in r:
                     err_count += 1
-                    print(f"{Fore.RED}[!] Error (fuzz){Style.RESET_ALL} {r['url']} => {r['error']}")
+                    print(f"{Fore.RED}[!] Error (fuzz){Style.RESET_ALL} {r.get('url','?')} => {r['error']}")
                     continue
 
                 code = r.get("status")
@@ -732,13 +990,17 @@ def main() -> None:
                 phase = f"[{r.get('phase')}]" if r.get("phase") else ""
 
                 sign = "[+]" if interesting else "[-]"
-                print(f"{color}{sign} {phase} {r['url']} (Status {code}){ms}{ctype}{size}{loc}{parent}{hints}{Style.RESET_ALL}")
+                print(f"{color}{sign} {phase} {r.get('url','?')} (Status {code}){ms}{ctype}{size}{loc}{parent}{hints}{Style.RESET_ALL}")
 
+    # Final summary
     print()
     if args.codes:
         print(f"{Fore.CYAN}Resumen:{Style.RESET_ALL} coinciden={match_count} | interesantes={ok_count} | errores={err_count} | total_vistos={len(results)}")
     else:
         print(f"{Fore.CYAN}Resumen:{Style.RESET_ALL} interesantes={ok_count} | errores={err_count} | total={len(results)}")
+
+    # Print final host status
+    print(f"\n{Fore.CYAN}Host status:{Style.RESET_ALL} {base_netloc} = {get_host_status(base_netloc)}")
 
     to_save = results
     if args.codes and not args.save_all:
